@@ -21,6 +21,7 @@ import { createEffect, onCleanup } from "solid-js"
 import { config } from "~/config"
 import { useI18n } from "~/context/i18n"
 import { useLanguage } from "~/context/language"
+import { WalletButton } from "./wallet-button"
 import "./header-context-menu.css"
 
 const isDarkMode = () => window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -174,6 +175,9 @@ export function Header(props: { zen?: boolean; hideGetStarted?: boolean }) {
               </Match>
             </Switch>
           </li>
+          <li>
+            <WalletButton />
+          </li>
           <Show when={!props.hideGetStarted}>
             <li>
               <A href={language.route("/download")} data-slot="cta-button">
@@ -269,6 +273,9 @@ export function Header(props: { zen?: boolean; hideGetStarted?: boolean }) {
                       <A href={language.route("/zen")}>{i18n.t("nav.zen")}</A>
                     </Match>
                   </Switch>
+                </li>
+                <li>
+                  <WalletButton />
                 </li>
                 <Show when={!props.hideGetStarted}>
                   <li>
