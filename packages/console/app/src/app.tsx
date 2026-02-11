@@ -8,7 +8,6 @@ import "@ibm/plex/css/ibm-plex.css"
 import "./app.css"
 import { LanguageProvider } from "~/context/language"
 import { I18nProvider } from "~/context/i18n"
-import { WalletProvider } from "~/context/wallet"
 import { strip } from "~/lib/language"
 
 export default function App() {
@@ -19,15 +18,13 @@ export default function App() {
       root={(props) => (
         <LanguageProvider>
           <I18nProvider>
-            <WalletProvider>
-              <MetaProvider>
-                <Title>opencode</Title>
-                <Meta name="description" content="OpenCode - The open source coding agent." />
-                <Favicon />
-                <Font />
-                <Suspense>{props.children}</Suspense>
-              </MetaProvider>
-            </WalletProvider>
+            <MetaProvider>
+              <Title>opencode</Title>
+              <Meta name="description" content="OpenCode - The open source coding agent." />
+              <Favicon />
+              <Font />
+              <Suspense>{props.children}</Suspense>
+            </MetaProvider>
           </I18nProvider>
         </LanguageProvider>
       )}

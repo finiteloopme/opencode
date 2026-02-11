@@ -5,7 +5,7 @@
  * Supports Somnia Mainnet (5031) and Somnia Testnet Shannon (50312).
  */
 
-import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 
@@ -33,15 +33,6 @@ export interface WalletState {
   isConnected: boolean
   isConnecting: boolean
   error: string | null
-}
-
-export interface UnsignedTransaction {
-  to: `0x${string}`
-  data?: `0x${string}`
-  value?: bigint
-  gas?: bigint
-  gasPrice?: bigint
-  nonce?: number
 }
 
 // Extend Window interface for ethereum provider
@@ -205,7 +196,7 @@ export const { use: useWallet, provider: WalletProvider } = createSimpleContext(
                 },
               ],
             })
-          } catch (addErr) {
+          } catch {
             setStore("error", `Failed to add ${chain.name}`)
           }
         } else {
@@ -214,44 +205,14 @@ export const { use: useWallet, provider: WalletProvider } = createSimpleContext(
       }
     }
 
-    const signTransaction = async (tx: UnsignedTransaction): Promise<`0x${string}` | null> => {
-      if (!window.ethereum || !store.address) {
-        setStore("error", "Wallet not connected")
-        return null
-      }
-
-      try {
-        const txHash = (await window.ethereum.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              from: store.address,
-              to: tx.to,
-              data: tx.data,
-              value: tx.value ? `0x${tx.value.toString(16)}` : undefined,
-              gas: tx.gas ? `0x${tx.gas.toString(16)}` : undefined,
-              gasPrice: tx.gasPrice ? `0x${tx.gasPrice.toString(16)}` : undefined,
-              nonce: tx.nonce ? `0x${tx.nonce.toString(16)}` : undefined,
-            },
-          ],
-        })) as `0x${string}`
-
-        return txHash
-      } catch (err) {
-        const error = err as Error
-        setStore("error", error.message || "Failed to sign transaction")
-        return null
-      }
-    }
-
-    const getChainInfo = () => {
+    const getChainInfo = createMemo(() => {
       if (!store.chainId) return null
       return SUPPORTED_CHAINS[store.chainId as SupportedChainId] || null
-    }
+    })
 
-    const isSupportedChain = () => {
+    const isSupportedChain = createMemo(() => {
       return store.chainId !== null && store.chainId in SUPPORTED_CHAINS
-    }
+    })
 
     const formatAddress = (address: string | null) => {
       if (!address) return ""
@@ -271,7 +232,6 @@ export const { use: useWallet, provider: WalletProvider } = createSimpleContext(
       connect,
       disconnect,
       switchChain,
-      signTransaction,
 
       // Helpers
       getChainInfo,

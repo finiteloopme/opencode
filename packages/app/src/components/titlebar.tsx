@@ -12,6 +12,7 @@ import { usePlatform } from "@/context/platform"
 import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { applyPath, backPath, forwardPath } from "./titlebar-history"
+import { WalletButton } from "./wallet-button"
 
 export function Titlebar() {
   const layout = useLayout()
@@ -252,6 +253,7 @@ export function Titlebar() {
         }}
         onMouseDown={drag}
       >
+        <WalletButton />
         <div id="opencode-titlebar-right" class="flex items-center gap-3 shrink-0 justify-end" />
         <Show when={windows()}>
           <div class="w-6 shrink-0" />
