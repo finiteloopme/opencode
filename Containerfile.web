@@ -1,0 +1,90 @@
+# OpenCode Container for Cloud Run
+# Builds frontend + backend into a single container
+#
+# Build: docker build -f Dockerfile.cloudrun -t opencode:latest .
+# Run:   docker run -p 8080:8080 -e PORT=8080 opencode:latest
+
+# =============================================================================
+# Stage 1: Install dependencies
+# =============================================================================
+FROM oven/bun:1.2-alpine AS deps
+
+WORKDIR /app
+
+# Copy workspace config and lockfile
+COPY package.json bun.lock ./
+COPY packages/app/package.json ./packages/app/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/sdk/js/package.json ./packages/sdk/js/
+COPY packages/plugin/package.json ./packages/plugin/
+COPY packages/util/package.json ./packages/util/
+COPY packages/opencode/package.json ./packages/opencode/
+COPY packages/script/package.json ./packages/script/
+
+# Install all dependencies
+RUN bun install --frozen-lockfile
+
+# =============================================================================
+# Stage 2: Build frontend
+# =============================================================================
+FROM deps AS frontend-builder
+
+# Copy frontend source
+COPY packages/app ./packages/app
+COPY packages/ui ./packages/ui
+COPY packages/sdk ./packages/sdk
+COPY packages/util ./packages/util
+COPY tsconfig.json ./
+
+# Build the frontend
+RUN cd packages/app && bun run build
+
+# =============================================================================
+# Stage 3: Build backend (opencode binary)
+# =============================================================================
+FROM deps AS backend-builder
+
+# Copy backend source
+COPY packages/opencode ./packages/opencode
+COPY packages/plugin ./packages/plugin
+COPY packages/util ./packages/util
+COPY packages/sdk ./packages/sdk
+COPY packages/script ./packages/script
+COPY tsconfig.json ./
+
+# Build opencode binary for current platform
+WORKDIR /app/packages/opencode
+RUN bun run build --single --skip-install
+
+# =============================================================================
+# Stage 4: Runtime
+# =============================================================================
+FROM alpine:3.20
+
+# Install runtime dependencies
+RUN apk add --no-cache libgcc libstdc++ ripgrep ca-certificates
+
+# Copy built opencode binary
+# Note: The build script creates platform-specific directories
+COPY --from=backend-builder /app/packages/opencode/dist/opencode-linux-*/bin/opencode /usr/local/bin/opencode
+
+# Copy built frontend
+COPY --from=frontend-builder /app/packages/app/dist /opt/frontend
+
+# Verify binary works
+RUN opencode --version
+
+# Environment variables
+ENV OPENCODE_STATIC_DIR=/opt/frontend
+ENV PORT=8080
+
+# Expose port (Cloud Run uses $PORT)
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:${PORT}/global/health || exit 1
+
+# Run opencode server
+# Use shell form to allow $PORT expansion
+CMD opencode serve --hostname 0.0.0.0 --port ${PORT}

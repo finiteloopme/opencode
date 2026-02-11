@@ -50,6 +50,31 @@ export namespace Server {
   let _url: URL | undefined
   let _corsWhitelist: string[] = []
 
+  // Content type mapping for static file serving
+  function getContentType(path: string): string {
+    const ext = path.split(".").pop()?.toLowerCase()
+    const types: Record<string, string> = {
+      html: "text/html",
+      css: "text/css",
+      js: "application/javascript",
+      mjs: "application/javascript",
+      json: "application/json",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      svg: "image/svg+xml",
+      ico: "image/x-icon",
+      woff: "font/woff",
+      woff2: "font/woff2",
+      ttf: "font/ttf",
+      eot: "application/vnd.ms-fontobject",
+      map: "application/json",
+      wasm: "application/wasm",
+    }
+    return types[ext ?? ""] ?? "application/octet-stream"
+  }
+
   export function url(): URL {
     return _url ?? new URL("http://localhost:4096")
   }
@@ -539,9 +564,41 @@ export namespace Server {
           },
         )
         .all("/*", async (c) => {
-          const path = c.req.path
+          const reqPath = c.req.path
+          const staticDir = process.env.OPENCODE_STATIC_DIR
 
-          const response = await proxy(`https://app.opencode.ai${path}`, {
+          // Serve static files if OPENCODE_STATIC_DIR is set
+          if (staticDir) {
+            const filePath = reqPath === "/" ? "/index.html" : reqPath
+            const fullPath = staticDir + filePath
+            const file = Bun.file(fullPath)
+
+            if (await file.exists()) {
+              const contentType = getContentType(filePath)
+              return new Response(file, {
+                headers: {
+                  "Content-Type": contentType,
+                  "Content-Security-Policy":
+                    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ws: wss: data:",
+                },
+              })
+            }
+
+            // SPA fallback: serve index.html for non-file routes
+            const indexFile = Bun.file(staticDir + "/index.html")
+            if (await indexFile.exists()) {
+              return new Response(indexFile, {
+                headers: {
+                  "Content-Type": "text/html",
+                  "Content-Security-Policy":
+                    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ws: wss: data:",
+                },
+              })
+            }
+          }
+
+          // Fallback: proxy to app.opencode.ai
+          const response = await proxy(`https://app.opencode.ai${reqPath}`, {
             ...c.req,
             headers: {
               ...c.req.raw.headers,
