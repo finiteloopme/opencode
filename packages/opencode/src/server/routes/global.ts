@@ -10,8 +10,46 @@ import { Log } from "../../util/log"
 import { lazy } from "../../util/lazy"
 import { Config } from "../../config/config"
 import { errors } from "../error"
+import { spawn } from "child_process"
 
 const log = Log.create({ service: "server" })
+
+/**
+ * Get current user email from gcloud CLI
+ */
+async function getGcloudAccount(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const proc = spawn("gcloud", ["config", "get", "account"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+
+    let stdout = ""
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString()
+    })
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        const email = stdout.trim()
+        if (email && email.includes("@")) {
+          resolve(email)
+          return
+        }
+      }
+      resolve(null)
+    })
+
+    proc.on("error", () => {
+      resolve(null)
+    })
+
+    // Timeout after 2 seconds
+    setTimeout(() => {
+      proc.kill()
+      resolve(null)
+    }, 2000)
+  })
+}
 
 export const GlobalDisposedEvent = BusEvent.define("global.disposed", z.object({}))
 
@@ -178,6 +216,58 @@ export const GlobalRoutes = lazy(() =>
           },
         })
         return c.json(true)
+      },
+    )
+    .get(
+      "/me",
+      describeRoute({
+        summary: "Get current user",
+        description:
+          "Get the currently authenticated user. In production (Cloud Run with IAP), reads from IAP headers. In local development, uses gcloud CLI account.",
+        operationId: "global.me",
+        responses: {
+          200: {
+            description: "Current user information",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    authenticated: z.boolean(),
+                    source: z.enum(["iap", "gcloud"]).optional(),
+                    email: z.string().optional(),
+                  }),
+                ),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        // Check for IAP headers (production - Cloud Run with IAP enabled)
+        const iapEmail = c.req.header("X-Goog-Authenticated-User-Email")
+
+        if (iapEmail) {
+          // IAP header format: "accounts.google.com:email@example.com"
+          const email = iapEmail.replace("accounts.google.com:", "")
+          return c.json({
+            authenticated: true,
+            source: "iap" as const,
+            email,
+          })
+        }
+
+        // Local development: get account from gcloud CLI
+        const gcloudEmail = await getGcloudAccount()
+        if (gcloudEmail) {
+          return c.json({
+            authenticated: true,
+            source: "gcloud" as const,
+            email: gcloudEmail,
+          })
+        }
+
+        // No authentication available
+        return c.json({ authenticated: false })
       },
     ),
 )

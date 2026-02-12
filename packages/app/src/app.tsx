@@ -28,6 +28,7 @@ import { LanguageProvider, useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { HighlightsProvider } from "@/context/highlights"
 import { WalletProvider } from "@/context/wallet"
+import { AuthProvider } from "@/context/auth"
 import { getServerUrl } from "@/lib/config"
 import Layout from "@/pages/layout"
 import DirectoryLayout from "@/pages/directory-layout"
@@ -116,20 +117,22 @@ export function AppInterface(props: { defaultUrl?: string; children?: JSX.Elemen
                 <SettingsProvider>
                   <PermissionProvider>
                     <LayoutProvider>
-                      <WalletProvider>
-                        <NotificationProvider>
-                          <ModelsProvider>
-                            <CommandProvider>
-                              <HighlightsProvider>
-                                <Layout>
-                                  {props.children}
-                                  {routerProps.children}
-                                </Layout>
-                              </HighlightsProvider>
-                            </CommandProvider>
-                          </ModelsProvider>
-                        </NotificationProvider>
-                      </WalletProvider>
+                      <AuthProvider>
+                        <WalletProvider>
+                          <NotificationProvider>
+                            <ModelsProvider>
+                              <CommandProvider>
+                                <HighlightsProvider>
+                                  <Layout>
+                                    {props.children}
+                                    {routerProps.children}
+                                  </Layout>
+                                </HighlightsProvider>
+                              </CommandProvider>
+                            </ModelsProvider>
+                          </NotificationProvider>
+                        </WalletProvider>
+                      </AuthProvider>
                     </LayoutProvider>
                   </PermissionProvider>
                 </SettingsProvider>
