@@ -10,7 +10,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import { Log } from "../../util/log"
-import { getAllAgents, getAgent, isAgentAvailable, type AgentConfig } from "./agents"
+import { getAllAgents, getAgent, getAgentSync, isAgentAvailable, initializeAgents, type AgentConfig } from "./agents"
 import { routeMessage, shouldRouteToA2A } from "./router"
 import { sendMessage, getAgentCard, checkAgentHealth, extractResponseText } from "./client"
 
@@ -31,6 +31,9 @@ function formatAgentInfo(agent: AgentConfig, healthy?: boolean): string {
 export async function A2APlugin(_input: PluginInput): Promise<Hooks> {
   log.info("initializing a2a plugin")
 
+  // Initialize agents from registry (or fallback to static)
+  await initializeAgents()
+
   return {
     tool: {
       /**
@@ -45,9 +48,7 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
 - Checking transaction status
 - Querying on-chain state`,
         args: {
-          message: tool.schema
-            .string()
-            .describe("The message to send to the blockchain agent"),
+          message: tool.schema.string().describe("The message to send to the blockchain agent"),
           agent: tool.schema
             .string()
             .optional()
@@ -67,13 +68,13 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
 
           if (agentId) {
             // Explicit agent specified
-            const agent = getAgent(agentId)
+            const agent = await getAgent(agentId)
             if (!agent) {
               return `Error: Unknown agent "${agentId}". Available agents: ${getAllAgents()
                 .map((a) => a.id)
                 .join(", ")}`
             }
-            if (!isAgentAvailable(agentId)) {
+            if (!(await isAgentAvailable(agentId))) {
               return `Error: Agent "${agentId}" is not currently available (status: ${agent.status})`
             }
             targetAgent = agent
@@ -128,10 +129,7 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
       "a2a-agents": tool({
         description: "List all available blockchain A2A agents and their status",
         args: {
-          checkHealth: tool.schema
-            .boolean()
-            .optional()
-            .describe("Optional: Check if agents are online (adds latency)"),
+          checkHealth: tool.schema.boolean().optional().describe("Optional: Check if agents are online (adds latency)"),
         },
         async execute(args, _context) {
           const { checkHealth } = args
@@ -162,16 +160,14 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
       "a2a-capabilities": tool({
         description: "Get the capabilities and skills of a specific blockchain A2A agent",
         args: {
-          agent: tool.schema
-            .string()
-            .describe("Agent ID (somnia, sonic, midnight)"),
+          agent: tool.schema.string().describe("Agent ID (somnia, sonic, midnight)"),
         },
         async execute(args, _context) {
           const { agent: agentId } = args
 
           log.info("a2a-capabilities called", { agentId })
 
-          const agent = getAgent(agentId)
+          const agent = await getAgent(agentId)
           if (!agent) {
             return `Error: Unknown agent "${agentId}". Available agents: ${getAllAgents()
               .map((a) => a.id)

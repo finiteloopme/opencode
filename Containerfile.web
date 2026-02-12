@@ -7,12 +7,17 @@
 # =============================================================================
 # Stage 1: Install dependencies
 # =============================================================================
-FROM oven/bun:1.2-alpine AS deps
+# Use bun 1.3+ as required by the build script
+FROM oven/bun:1.3-alpine AS deps
+
+# Install jq for JSON manipulation and git for the build script
+RUN apk add --no-cache jq git
 
 WORKDIR /app
 
-# Copy workspace config and lockfile
+# Copy workspace config, lockfile, and patches
 COPY package.json bun.lock ./
+COPY patches/ ./patches/
 COPY packages/app/package.json ./packages/app/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/sdk/js/package.json ./packages/sdk/js/
@@ -21,8 +26,19 @@ COPY packages/util/package.json ./packages/util/
 COPY packages/opencode/package.json ./packages/opencode/
 COPY packages/script/package.json ./packages/script/
 
+# Filter package.json to only include workspaces that are actually copied
+# This prevents "workspace not found" errors for packages like slack, console, etc.
+RUN jq '.workspaces.packages = ["packages/app", "packages/ui", "packages/sdk/js", "packages/plugin", "packages/util", "packages/opencode", "packages/script"]' package.json > package.filtered.json \
+    && mv package.filtered.json package.json
+
 # Install all dependencies
-RUN bun install --frozen-lockfile
+# Note: Cannot use --frozen-lockfile since we modified workspaces above
+RUN bun install
+
+# Verify @opentui packages are installed (they're required for the build)
+RUN ls /app/node_modules/@opentui/ 2>/dev/null || \
+    (echo "Installing missing @opentui packages..." && \
+     cd /app/packages/opencode && bun install)
 
 # =============================================================================
 # Stage 2: Build frontend
@@ -52,9 +68,14 @@ COPY packages/sdk ./packages/sdk
 COPY packages/script ./packages/script
 COPY tsconfig.json ./
 
+# Remove any local node_modules that got copied (broken symlinks in container)
+# Run bun install in opencode package to ensure all deps are linked properly
+RUN rm -rf /app/packages/opencode/node_modules && \
+    cd /app/packages/opencode && bun install
+
 # Build opencode binary for current platform
-WORKDIR /app/packages/opencode
-RUN bun run build --single --skip-install
+# Set OPENCODE_CHANNEL to avoid git branch lookup (no .git in container)
+RUN cd packages/opencode && OPENCODE_CHANNEL=latest bun run build --single --skip-install
 
 # =============================================================================
 # Stage 4: Runtime

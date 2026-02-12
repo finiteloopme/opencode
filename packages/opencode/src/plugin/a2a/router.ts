@@ -7,7 +7,7 @@
  * 3. Default agent when no specific match
  */
 
-import { AGENTS, type AgentConfig, getActiveAgents } from "./agents"
+import { type AgentConfig, getAllAgents, getActiveAgentsSync, getAgentSync } from "./agents"
 
 export interface RouteResult {
   agent: AgentConfig
@@ -20,29 +20,38 @@ export interface RouteResult {
  */
 function checkExplicitMention(message: string): AgentConfig | null {
   const lowerMessage = message.toLowerCase()
+  const agents = getAllAgents()
+  const agentMap = new Map(agents.map((a) => [a.id, a]))
 
   // Check for @agent pattern
   const atPattern = /@(\w+)/g
   let match
   while ((match = atPattern.exec(lowerMessage)) !== null) {
     const agentId = match[1]
-    if (AGENTS[agentId]) {
-      return AGENTS[agentId]
+    const agent = agentMap.get(agentId)
+    if (agent) {
+      return agent
     }
   }
 
   // Check for "use <agent>" pattern
   const usePattern = /\buse\s+(\w+)\b/i
   const useMatch = lowerMessage.match(usePattern)
-  if (useMatch && AGENTS[useMatch[1]]) {
-    return AGENTS[useMatch[1]]
+  if (useMatch) {
+    const agent = agentMap.get(useMatch[1])
+    if (agent) {
+      return agent
+    }
   }
 
   // Check for "on <agent>" pattern
   const onPattern = /\bon\s+(\w+)\s+(chain|network|blockchain)?\b/i
   const onMatch = lowerMessage.match(onPattern)
-  if (onMatch && AGENTS[onMatch[1]]) {
-    return AGENTS[onMatch[1]]
+  if (onMatch) {
+    const agent = agentMap.get(onMatch[1])
+    if (agent) {
+      return agent
+    }
   }
 
   return null
@@ -53,7 +62,7 @@ function checkExplicitMention(message: string): AgentConfig | null {
  */
 function checkKeywordMatch(message: string): { agent: AgentConfig; keywords: string[] } | null {
   const lowerMessage = message.toLowerCase()
-  const activeAgents = getActiveAgents()
+  const activeAgents = getActiveAgentsSync()
 
   let bestMatch: { agent: AgentConfig; keywords: string[]; score: number } | null = null
 
@@ -78,11 +87,28 @@ function checkKeywordMatch(message: string): { agent: AgentConfig; keywords: str
 }
 
 /**
- * Get the default agent (first active agent, or somnia)
+ * Get the default agent (first active agent, or somnia fallback)
  */
 function getDefaultAgent(): AgentConfig {
-  const activeAgents = getActiveAgents()
-  return activeAgents.length > 0 ? activeAgents[0] : AGENTS.somnia
+  const activeAgents = getActiveAgentsSync()
+  if (activeAgents.length > 0) {
+    return activeAgents[0]
+  }
+  // Ultimate fallback
+  const somnia = getAgentSync("somnia")
+  if (somnia) {
+    return somnia
+  }
+  // Should never reach here, but provide a safe default
+  return {
+    id: "somnia",
+    name: "Somnia Agent",
+    description: "High-performance EVM L1",
+    url: process.env.SOMNIA_AGENT_URL || "http://localhost:4001",
+    chainId: 50312,
+    status: "active",
+    keywords: ["somnia", "solidity"],
+  }
 }
 
 /**
