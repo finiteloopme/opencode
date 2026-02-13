@@ -219,6 +219,33 @@ export const GlobalRoutes = lazy(() =>
       },
     )
     .get(
+      "/app-config",
+      describeRoute({
+        summary: "Get application configuration",
+        description: "Get application-level configuration including login page URL for sign-out redirect.",
+        operationId: "global.appConfig",
+        responses: {
+          200: {
+            description: "Application configuration",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    loginPageUrl: z.string().nullable(),
+                  }),
+                ),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        return c.json({
+          loginPageUrl: process.env.LOGIN_PAGE_URL || null,
+        })
+      },
+    )
+    .get(
       "/me",
       describeRoute({
         summary: "Get current user",

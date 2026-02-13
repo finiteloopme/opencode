@@ -3,6 +3,10 @@
  *
  * In production (Cloud Run with IAP), reads user from IAP headers.
  * In local development, uses gcloud CLI account.
+ *
+ * Sign-out behavior:
+ * - In production: redirects to login page (LOGIN_PAGE_URL)
+ * - In local dev: clears local state only (gcloud auth remains)
  */
 
 import { createEffect } from "solid-js"
@@ -16,12 +20,17 @@ interface MeResponse {
   email?: string
 }
 
+interface AppConfigResponse {
+  loginPageUrl: string | null
+}
+
 export interface AuthState {
   email: string | null
   source: "iap" | "gcloud" | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  loginPageUrl: string | null
 }
 
 export const { use: useAuth, provider: AuthProvider } = createSimpleContext({
@@ -36,11 +45,13 @@ export const { use: useAuth, provider: AuthProvider } = createSimpleContext({
       isAuthenticated: false,
       isLoading: true,
       error: null,
+      loginPageUrl: null,
     })
 
-    // Fetch current user on mount
+    // Fetch current user and app config on mount
     createEffect(() => {
       fetchUser()
+      fetchAppConfig()
     })
 
     const fetchUser = async () => {
@@ -77,11 +88,34 @@ export const { use: useAuth, provider: AuthProvider } = createSimpleContext({
       }
     }
 
+    const fetchAppConfig = async () => {
+      try {
+        const response = await fetch(`${server.url}/global/app-config`, {
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data: AppConfigResponse = await response.json()
+          setStore("loginPageUrl", data.loginPageUrl)
+        }
+      } catch (err) {
+        // Non-critical - just log and continue
+        console.warn("Failed to fetch app config:", err)
+      }
+    }
+
     const signOut = () => {
-      // Clear local state only - don't sign out of Google
+      // Clear local state
       setStore("email", null)
       setStore("source", null)
       setStore("isAuthenticated", false)
+
+      // Redirect to login page if configured (production)
+      // In local dev, loginPageUrl is null - just stay on app
+      const loginUrl = store.loginPageUrl
+      if (loginUrl) {
+        window.location.href = loginUrl
+      }
     }
 
     const formatEmail = (email: string | null) => {
@@ -100,6 +134,7 @@ export const { use: useAuth, provider: AuthProvider } = createSimpleContext({
       isAuthenticated: () => store.isAuthenticated,
       isLoading: () => store.isLoading,
       error: () => store.error,
+      loginPageUrl: () => store.loginPageUrl,
 
       // Actions
       refresh: fetchUser,
