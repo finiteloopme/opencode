@@ -5,7 +5,7 @@ import { describeRoute, generateSpecs, validator, resolver, openAPIRouteHandler 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
-import { proxy } from "hono/proxy"
+
 import { basicAuth } from "hono/basic-auth"
 import z from "zod"
 import { Provider } from "../provider/provider"
@@ -597,19 +597,11 @@ export namespace Server {
             }
           }
 
-          // Fallback: proxy to app.opencode.ai
-          const response = await proxy(`https://app.opencode.ai${reqPath}`, {
-            ...c.req,
-            headers: {
-              ...c.req.raw.headers,
-              host: "app.opencode.ai",
-            },
+          // No frontend configured
+          return new Response("Frontend not configured. Set OPENCODE_STATIC_DIR or run Vite dev server.", {
+            status: 404,
+            headers: { "Content-Type": "text/plain" },
           })
-          response.headers.set(
-            "Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data:",
-          )
-          return response
         }) as unknown as Hono,
   )
 
