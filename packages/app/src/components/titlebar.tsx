@@ -254,8 +254,10 @@ export function Titlebar() {
         }}
         onMouseDown={drag}
       >
-        <AuthButton />
-        <WalletButton />
+        <div class="flex items-center gap-3">
+          <AuthButton />
+          <WalletButton />
+        </div>
         <div id="opencode-titlebar-right" class="flex items-center gap-3 shrink-0 justify-end" />
         <Show when={windows()}>
           <div class="w-6 shrink-0" />

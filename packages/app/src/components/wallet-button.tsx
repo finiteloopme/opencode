@@ -30,19 +30,15 @@ export function WalletButton() {
           onClick={() => (wallet.hasProvider() ? wallet.connect() : openMetaMask())}
           disabled={wallet.isConnecting()}
         >
-          <Icon name="link" size="small" />
-          <Show when={wallet.isConnecting()} fallback={<span>Connect</span>}>
+          <Icon name="wallet" size="small" />
+          <Show when={wallet.isConnecting()} fallback={<span>Connect Wallet</span>}>
             <span>Connecting...</span>
           </Show>
         </Button>
       }
     >
       <DropdownMenu>
-        <DropdownMenu.Trigger
-          as={Button}
-          variant="ghost"
-          class="h-6 px-2 gap-1.5 text-12-regular"
-        >
+        <DropdownMenu.Trigger as={Button} variant="ghost" class="h-6 px-2 gap-1.5 text-12-regular">
           <Show when={wallet.isSupportedChain()}>
             <div class="size-1.5 rounded-full bg-icon-success-base" />
           </Show>
@@ -60,9 +56,7 @@ export function WalletButton() {
               <DropdownMenu.GroupLabel class="text-11-regular text-text-weak px-3 py-1.5">
                 Connected
               </DropdownMenu.GroupLabel>
-              <div class="px-3 py-1.5 text-12-regular text-text-base font-mono truncate">
-                {wallet.address()}
-              </div>
+              <div class="px-3 py-1.5 text-12-regular text-text-base font-mono truncate">{wallet.address()}</div>
             </DropdownMenu.Group>
 
             <DropdownMenu.Separator />
