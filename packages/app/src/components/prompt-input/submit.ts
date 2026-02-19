@@ -40,6 +40,8 @@ type PromptSubmitInput = {
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void
   onSubmit?: () => void
+  /** Selected blockchain agent IDs for A2A routing (deterministic filtering) */
+  selectedAgentIds?: Accessor<string[]>
 }
 
 type CommentItem = {
@@ -392,6 +394,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         messageID,
         parts: requestParts,
         variant,
+        // Pass selected blockchain agent IDs for deterministic A2A routing
+        selectedAgentIds: input.selectedAgentIds?.(),
       })
     }
 

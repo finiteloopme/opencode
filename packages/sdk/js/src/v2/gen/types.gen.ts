@@ -2294,6 +2294,116 @@ export type GlobalDisposeResponses = {
 
 export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeResponses]
 
+export type GlobalAppConfigData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/app-config"
+}
+
+export type GlobalAppConfigResponses = {
+  /**
+   * Application configuration
+   */
+  200: {
+    loginPageUrl: string | null
+  }
+}
+
+export type GlobalAppConfigResponse = GlobalAppConfigResponses[keyof GlobalAppConfigResponses]
+
+export type GlobalMeData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/me"
+}
+
+export type GlobalMeResponses = {
+  /**
+   * Current user information
+   */
+  200: {
+    authenticated: boolean
+    source?: "iap" | "gcloud"
+    email?: string
+  }
+}
+
+export type GlobalMeResponse = GlobalMeResponses[keyof GlobalMeResponses]
+
+export type GlobalRegistryAgentsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/registry/agents"
+}
+
+export type GlobalRegistryAgentsErrors = {
+  /**
+   * Agent registry unavailable
+   */
+  502: {
+    error: string
+  }
+}
+
+export type GlobalRegistryAgentsError = GlobalRegistryAgentsErrors[keyof GlobalRegistryAgentsErrors]
+
+export type GlobalRegistryAgentsResponses = {
+  /**
+   * List of blockchain agents
+   */
+  200: {
+    agents: Array<{
+      id: string
+      name: string
+      description: string
+      url: string
+      chainId: number
+      keywords: Array<string>
+      enabled: boolean
+    }>
+    version: string
+    updated?: string
+  }
+}
+
+export type GlobalRegistryAgentsResponse = GlobalRegistryAgentsResponses[keyof GlobalRegistryAgentsResponses]
+
+export type GlobalRegistryAgentsHealthData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/registry/agents/health"
+}
+
+export type GlobalRegistryAgentsHealthErrors = {
+  /**
+   * Agent registry unavailable
+   */
+  502: {
+    error: string
+  }
+}
+
+export type GlobalRegistryAgentsHealthError = GlobalRegistryAgentsHealthErrors[keyof GlobalRegistryAgentsHealthErrors]
+
+export type GlobalRegistryAgentsHealthResponses = {
+  /**
+   * Health status of all agents
+   */
+  200: Array<{
+    id: string
+    healthy: boolean
+    latencyMs?: number
+    error?: string
+  }>
+}
+
+export type GlobalRegistryAgentsHealthResponse =
+  GlobalRegistryAgentsHealthResponses[keyof GlobalRegistryAgentsHealthResponses]
+
 export type AuthRemoveData = {
   body?: never
   path: {
@@ -3398,6 +3508,10 @@ export type SessionPromptData = {
     }
     system?: string
     variant?: string
+    /**
+     * Blockchain agent IDs to use for A2A routing (deterministic filtering)
+     */
+    selectedAgentIds?: Array<string>
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3585,6 +3699,10 @@ export type SessionPromptAsyncData = {
     }
     system?: string
     variant?: string
+    /**
+     * Blockchain agent IDs to use for A2A routing (deterministic filtering)
+     */
+    selectedAgentIds?: Array<string>
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {

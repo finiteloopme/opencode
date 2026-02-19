@@ -34,12 +34,18 @@ import type {
   FindSymbolsResponses,
   FindTextResponses,
   FormatterStatusResponses,
+  GlobalAppConfigResponses,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
   GlobalConfigUpdateResponses,
   GlobalDisposeResponses,
   GlobalEventResponses,
   GlobalHealthResponses,
+  GlobalMeResponses,
+  GlobalRegistryAgentsErrors,
+  GlobalRegistryAgentsHealthErrors,
+  GlobalRegistryAgentsHealthResponses,
+  GlobalRegistryAgentsResponses,
   InstanceDisposeResponses,
   LspStatusResponses,
   McpAddErrors,
@@ -256,6 +262,41 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Agents extends HeyApiClient {
+  /**
+   * Get blockchain agents health
+   *
+   * Proxy to the Agent Registry service to get health status of all blockchain agents.
+   */
+  public health<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<
+      GlobalRegistryAgentsHealthResponses,
+      GlobalRegistryAgentsHealthErrors,
+      ThrowOnError
+    >({ url: "/global/registry/agents/health", ...options })
+  }
+}
+
+export class Registry extends HeyApiClient {
+  /**
+   * List blockchain agents
+   *
+   * Proxy to the Agent Registry service to get a list of available blockchain agents (Somnia, Midnight, etc.).
+   */
+  public agents<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<
+      GlobalRegistryAgentsResponses,
+      GlobalRegistryAgentsErrors,
+      ThrowOnError
+    >({ url: "/global/registry/agents", ...options })
+  }
+
+  private _agents?: Agents
+  get agents2(): Agents {
+    return (this._agents ??= new Agents({ client: this.client }))
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -293,9 +334,38 @@ export class Global extends HeyApiClient {
     })
   }
 
+  /**
+   * Get application configuration
+   *
+   * Get application-level configuration including login page URL for sign-out redirect.
+   */
+  public appConfig<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalAppConfigResponses, unknown, ThrowOnError>({
+      url: "/global/app-config",
+      ...options,
+    })
+  }
+
+  /**
+   * Get current user
+   *
+   * Get the currently authenticated user. In production (Cloud Run with IAP), reads from IAP headers. In local development, uses gcloud CLI account.
+   */
+  public me<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalMeResponses, unknown, ThrowOnError>({
+      url: "/global/me",
+      ...options,
+    })
+  }
+
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _registry?: Registry
+  get registry(): Registry {
+    return (this._registry ??= new Registry({ client: this.client }))
   }
 }
 
@@ -1475,6 +1545,7 @@ export class Session extends HeyApiClient {
       }
       system?: string
       variant?: string
+      selectedAgentIds?: Array<string>
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -1493,6 +1564,7 @@ export class Session extends HeyApiClient {
             { in: "body", key: "tools" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "selectedAgentIds" },
             { in: "body", key: "parts" },
           ],
         },
@@ -1563,6 +1635,7 @@ export class Session extends HeyApiClient {
       }
       system?: string
       variant?: string
+      selectedAgentIds?: Array<string>
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -1581,6 +1654,7 @@ export class Session extends HeyApiClient {
             { in: "body", key: "tools" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "selectedAgentIds" },
             { in: "body", key: "parts" },
           ],
         },

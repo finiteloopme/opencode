@@ -162,6 +162,8 @@ export interface Hooks {
       model?: { providerID: string; modelID: string }
       messageID?: string
       variant?: string
+      /** Blockchain agent IDs selected by user for A2A routing */
+      selectedAgentIds?: string[]
     },
     output: { message: UserMessage; parts: Part[] },
   ) => Promise<void>

@@ -99,6 +99,10 @@ export namespace SessionPrompt {
       ),
     system: z.string().optional(),
     variant: z.string().optional(),
+    selectedAgentIds: z
+      .array(z.string())
+      .optional()
+      .describe("Blockchain agent IDs to use for A2A routing (deterministic filtering)"),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -1214,6 +1218,7 @@ export namespace SessionPrompt {
         model: input.model,
         messageID: input.messageID,
         variant: input.variant,
+        selectedAgentIds: input.selectedAgentIds,
       },
       {
         message: info,

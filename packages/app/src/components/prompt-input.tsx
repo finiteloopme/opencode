@@ -29,6 +29,8 @@ import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
+import { AgentPicker } from "@/components/agent-picker"
+import { useAgents } from "@/context/agents"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
@@ -99,6 +101,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const agents = useAgents()
   let editorRef!: HTMLDivElement
   let fileInputRef!: HTMLInputElement
   let scrollRef!: HTMLDivElement
@@ -790,6 +793,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     newSessionWorktree: () => props.newSessionWorktree,
     onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
     onSubmit: props.onSubmit,
+    selectedAgentIds: () => agents.selectedIds,
   })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1104,6 +1108,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </Button>
                   </TooltipKeybind>
                 </Show>
+                {/* Blockchain Agent Picker */}
+                <AgentPicker />
                 <Show when={permission.permissionsEnabled() && params.id}>
                   <TooltipKeybind
                     placement="top"

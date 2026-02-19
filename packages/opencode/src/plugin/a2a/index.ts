@@ -5,16 +5,30 @@
  * - a2a-send: Send messages to blockchain agents (auto-routes or explicit)
  * - a2a-agents: List available agents and their status
  * - a2a-capabilities: Get agent card/skills
+ *
+ * Agent Selection:
+ * - Users can select which agents are available via the frontend agent picker
+ * - Selection is passed through PromptInput.selectedAgentIds
+ * - Filtering is deterministic: session selection overrides LLM args
+ * - Default agents are configured via A2A_DEFAULT_AGENTS env var
  */
 
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import { Log } from "../../util/log"
-import { getAllAgents, getAgent, getAgentSync, isAgentAvailable, initializeAgents, type AgentConfig } from "./agents"
+import { getAllAgents, getAgent, isAgentAvailable, initializeAgents, type AgentConfig } from "./agents"
 import { routeMessage, shouldRouteToA2A } from "./router"
 import { sendMessage, getAgentCard, checkAgentHealth, extractResponseText } from "./client"
+import { getDefaultAgentIds } from "./config"
 
 const log = Log.create({ service: "plugin.a2a" })
+
+/**
+ * Session-scoped agent selection state (ephemeral)
+ * Maps sessionID -> selected agent IDs
+ * Cleared when session ends or on refresh
+ */
+const sessionAgentSelection = new Map<string, string[]>()
 
 /**
  * Format agent info for display
@@ -46,7 +60,10 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
 - Generating smart contracts (Solidity)
 - Deploying contracts
 - Checking transaction status
-- Querying on-chain state`,
+- Querying on-chain state
+
+Note: Agent filtering is determined by user's session selection (set via UI agent picker).
+The selectedAgents argument is ignored if a session selection exists.`,
         args: {
           message: tool.schema.string().describe("The message to send to the blockchain agent"),
           agent: tool.schema
@@ -61,7 +78,18 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
         async execute(args, _context) {
           const { message, agent: agentId, timeout } = args
 
-          log.info("a2a-send called", { message: message.substring(0, 100), agentId })
+          // Deterministic agent filtering:
+          // 1. Session selection (from frontend agent picker) takes precedence
+          // 2. Falls back to config default (A2A_DEFAULT_AGENTS)
+          const sessionSelection = sessionAgentSelection.get(_context.sessionID)
+          const effectiveFilter = sessionSelection ?? getDefaultAgentIds()
+
+          log.info("a2a-send called", {
+            message: message.substring(0, 100),
+            agentId,
+            sessionSelection: sessionSelection ?? "none",
+            effectiveFilter,
+          })
 
           // Determine which agent to use
           let targetAgent: AgentConfig
@@ -74,19 +102,30 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
                 .map((a) => a.id)
                 .join(", ")}`
             }
+            // Check if agent is in effective filter (deterministic check)
+            if (effectiveFilter.length > 0 && !effectiveFilter.includes(agentId)) {
+              return `Error: Agent "${agentId}" is not in the allowed agents list. Allowed: ${effectiveFilter.join(", ")}. Adjust your agent selection in the UI to include this agent.`
+            }
             if (!(await isAgentAvailable(agentId))) {
               return `Error: Agent "${agentId}" is not currently available (status: ${agent.status})`
             }
             targetAgent = agent
           } else {
-            // Auto-route based on message content
-            const route = routeMessage(message)
+            // Auto-route based on message content, filtered by effective selection
+            const route = routeMessage(message, { selectedAgentIds: effectiveFilter })
+            if (!route) {
+              const availableAgents = getAllAgents()
+                .map((a) => a.id)
+                .join(", ")
+              return `Error: No agents available for routing. ${effectiveFilter.length ? `Allowed agents (${effectiveFilter.join(", ")}) are not available or don't match any active agents.` : ""} All registered agents: ${availableAgents}`
+            }
             targetAgent = route.agent
 
             log.info("auto-routed message", {
               agent: targetAgent.id,
               confidence: route.confidence,
               keywords: route.matchedKeywords,
+              effectiveFilter,
             })
           }
 
@@ -96,9 +135,13 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
             return `Error: Agent "${targetAgent.name}" at ${targetAgent.url} is not reachable. Please ensure the agent is running.`
           }
 
-          // Send the message
+          // Send the message with OpenCode session ID as A2A context ID
+          // This maintains session continuity across multiple calls (e.g., compile → deploy)
           try {
-            const response = await sendMessage(targetAgent.url, message, { timeout })
+            const response = await sendMessage(targetAgent.url, message, {
+              timeout,
+              contextId: _context.sessionID,
+            })
 
             // Check for errors
             if (response.error) {
@@ -229,23 +272,53 @@ or you can specify an agent explicitly. Use this for blockchain operations like:
     },
 
     /**
-     * Hook into chat messages to detect blockchain-related requests
-     * This is informational only - doesn't modify the message
+     * Hook into chat messages to:
+     * 1. Capture user's selected agent IDs from the prompt
+     * 2. Detect blockchain-related requests (informational)
      */
     "chat.message": async (input, _output) => {
+      // Capture agent selection from the prompt (deterministic filtering)
+      if (input.selectedAgentIds && input.selectedAgentIds.length > 0) {
+        sessionAgentSelection.set(input.sessionID, input.selectedAgentIds)
+        log.info("captured agent selection for session", {
+          sessionID: input.sessionID,
+          selectedAgentIds: input.selectedAgentIds,
+        })
+      }
+
       // Log when blockchain-related messages are detected
       const firstPart = _output.parts[0]
       if (firstPart && "text" in firstPart && firstPart.text) {
         const text = firstPart.text
         if (shouldRouteToA2A(text)) {
-          const route = routeMessage(text)
-          log.info("blockchain-related message detected", {
-            sessionID: input.sessionID,
-            agent: route.agent.id,
-            confidence: route.confidence,
-          })
+          const effectiveFilter = sessionAgentSelection.get(input.sessionID) ?? getDefaultAgentIds()
+          const route = routeMessage(text, { selectedAgentIds: effectiveFilter })
+          if (route) {
+            log.info("blockchain-related message detected", {
+              sessionID: input.sessionID,
+              agent: route.agent.id,
+              confidence: route.confidence,
+              effectiveFilter,
+            })
+          }
         }
       }
     },
   }
+}
+
+/**
+ * Clear session agent selection (call when session ends)
+ * Exported for potential use by session cleanup
+ */
+export function clearSessionAgentSelection(sessionID: string): void {
+  sessionAgentSelection.delete(sessionID)
+  log.info("cleared agent selection for session", { sessionID })
+}
+
+/**
+ * Get current session agent selection (for debugging/testing)
+ */
+export function getSessionAgentSelection(sessionID: string): string[] | undefined {
+  return sessionAgentSelection.get(sessionID)
 }
