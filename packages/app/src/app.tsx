@@ -28,6 +28,7 @@ import { LanguageProvider, useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { HighlightsProvider } from "@/context/highlights"
 import { WalletProvider } from "@/context/wallet"
+import { AgentsProvider } from "@/context/agents"
 import { AuthProvider } from "@/context/auth"
 import { getServerUrl } from "@/lib/config"
 import Layout from "@/pages/layout"
@@ -119,18 +120,20 @@ export function AppInterface(props: { defaultUrl?: string; children?: JSX.Elemen
                     <LayoutProvider>
                       <AuthProvider>
                         <WalletProvider>
-                          <NotificationProvider>
-                            <ModelsProvider>
-                              <CommandProvider>
-                                <HighlightsProvider>
-                                  <Layout>
-                                    {props.children}
-                                    {routerProps.children}
-                                  </Layout>
-                                </HighlightsProvider>
-                              </CommandProvider>
-                            </ModelsProvider>
-                          </NotificationProvider>
+                          <AgentsProvider>
+                            <NotificationProvider>
+                              <ModelsProvider>
+                                <CommandProvider>
+                                  <HighlightsProvider>
+                                    <Layout>
+                                      {props.children}
+                                      {routerProps.children}
+                                    </Layout>
+                                  </HighlightsProvider>
+                                </CommandProvider>
+                              </ModelsProvider>
+                            </NotificationProvider>
+                          </AgentsProvider>
                         </WalletProvider>
                       </AuthProvider>
                     </LayoutProvider>

@@ -90,6 +90,24 @@ const FALLBACK_AGENTS: Record<string, AgentConfig> = {
     status: "pending",
     keywords: ["midnight", "privacy", "zk", "zero knowledge", "confidential"],
   },
+  store: {
+    id: "store",
+    name: "Store Agent",
+    description: "Mock stationery web store. Browse and purchase items with crypto payments via x402.",
+    url: process.env.STORE_AGENT_URL || "http://localhost:4004",
+    chainId: 0,
+    status: "active",
+    keywords: ["store", "shop", "buy", "purchase", "stationery", "notebook", "pen", "pencil", "eraser", "catalog", "browse", "order", "cart"],
+  },
+  payment: {
+    id: "payment",
+    name: "Payment Agent",
+    description: "x402 payment facilitator. Handles USDC payments, verification, and settlement.",
+    url: process.env.PAYMENT_AGENT_URL || "http://localhost:4005",
+    chainId: 0,
+    status: "active",
+    keywords: ["pay", "payment", "settle", "x402", "usdc", "transfer", "facilitator", "checkout", "invoice"],
+  },
 }
 
 /**

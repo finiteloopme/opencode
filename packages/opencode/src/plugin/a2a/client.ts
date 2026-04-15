@@ -111,11 +111,39 @@ export async function sendMessage(
   options?: {
     timeout?: number
     taskId?: string
+    contextId?: string
+    artifacts?: Array<{ name: string; content: string; mimeType?: string }>
   },
 ): Promise<A2AResponse> {
   const requestId = generateRequestId()
   const messageId = generateMessageId()
   const timeout = options?.timeout ?? 60000
+
+  // Build message parts - start with text
+  const parts: MessagePart[] = [
+    {
+      kind: "text" as const,
+      text,
+    },
+  ]
+
+  // Add file artifacts if provided
+  if (options?.artifacts && options.artifacts.length > 0) {
+    for (const artifact of options.artifacts) {
+      parts.push({
+        kind: "file" as const,
+        file: {
+          name: artifact.name,
+          mimeType: artifact.mimeType || "text/plain",
+          bytes: Buffer.from(artifact.content).toString("base64"),
+        },
+      })
+    }
+    log.info("including artifacts in message", {
+      count: options.artifacts.length,
+      names: options.artifacts.map((a) => a.name),
+    })
+  }
 
   const requestBody = {
     jsonrpc: "2.0" as const,
@@ -126,17 +154,13 @@ export async function sendMessage(
       message: {
         messageId,
         role: "user" as const,
-        parts: [
-          {
-            kind: "text" as const,
-            text,
-          },
-        ],
+        contextId: options?.contextId,
+        parts,
       },
     },
   }
 
-  log.info("sending a2a message", { agentUrl, requestId, messageId })
+  log.info("sending a2a message", { agentUrl, requestId, messageId, partsCount: parts.length })
 
   try {
     const controller = new AbortController()

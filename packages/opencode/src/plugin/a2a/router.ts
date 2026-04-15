@@ -15,12 +15,28 @@ export interface RouteResult {
   matchedKeywords?: string[]
 }
 
+export interface RouteOptions {
+  /** Filter routing to only these agent IDs. If empty/undefined, all active agents are considered. */
+  selectedAgentIds?: string[]
+}
+
+/**
+ * Filter agents by selected IDs
+ */
+function filterBySelection(agents: AgentConfig[], selectedIds?: string[]): AgentConfig[] {
+  if (!selectedIds || selectedIds.length === 0) {
+    return agents
+  }
+  const idSet = new Set(selectedIds)
+  return agents.filter((a) => idSet.has(a.id))
+}
+
 /**
  * Check if message explicitly mentions an agent
  */
-function checkExplicitMention(message: string): AgentConfig | null {
+function checkExplicitMention(message: string, selectedIds?: string[]): AgentConfig | null {
   const lowerMessage = message.toLowerCase()
-  const agents = getAllAgents()
+  const agents = filterBySelection(getAllAgents(), selectedIds)
   const agentMap = new Map(agents.map((a) => [a.id, a]))
 
   // Check for @agent pattern
@@ -60,9 +76,9 @@ function checkExplicitMention(message: string): AgentConfig | null {
 /**
  * Check for keyword matches in the message
  */
-function checkKeywordMatch(message: string): { agent: AgentConfig; keywords: string[] } | null {
+function checkKeywordMatch(message: string, selectedIds?: string[]): { agent: AgentConfig; keywords: string[] } | null {
   const lowerMessage = message.toLowerCase()
-  const activeAgents = getActiveAgentsSync()
+  const activeAgents = filterBySelection(getActiveAgentsSync(), selectedIds)
 
   let bestMatch: { agent: AgentConfig; keywords: string[]; score: number } | null = null
 
@@ -87,14 +103,18 @@ function checkKeywordMatch(message: string): { agent: AgentConfig; keywords: str
 }
 
 /**
- * Get the default agent (first active agent, or somnia fallback)
+ * Get the default agent (first active agent from selection, or somnia fallback)
  */
-function getDefaultAgent(): AgentConfig {
-  const activeAgents = getActiveAgentsSync()
+function getDefaultAgent(selectedIds?: string[]): AgentConfig | null {
+  const activeAgents = filterBySelection(getActiveAgentsSync(), selectedIds)
   if (activeAgents.length > 0) {
     return activeAgents[0]
   }
-  // Ultimate fallback
+  // If selection was provided but no agents match, return null
+  if (selectedIds && selectedIds.length > 0) {
+    return null
+  }
+  // Ultimate fallback when no selection filter
   const somnia = getAgentSync("somnia")
   if (somnia) {
     return somnia
@@ -113,10 +133,15 @@ function getDefaultAgent(): AgentConfig {
 
 /**
  * Route a message to the appropriate agent
+ * @param message - The user's message
+ * @param options - Routing options including selected agent filter
+ * @returns RouteResult or null if no agents available in selection
  */
-export function routeMessage(message: string): RouteResult {
-  // 1. Check explicit mention
-  const explicitAgent = checkExplicitMention(message)
+export function routeMessage(message: string, options?: RouteOptions): RouteResult | null {
+  const selectedIds = options?.selectedAgentIds
+
+  // 1. Check explicit mention (within selected agents)
+  const explicitAgent = checkExplicitMention(message, selectedIds)
   if (explicitAgent && explicitAgent.status === "active") {
     return {
       agent: explicitAgent,
@@ -124,8 +149,8 @@ export function routeMessage(message: string): RouteResult {
     }
   }
 
-  // 2. Check keyword matches
-  const keywordMatch = checkKeywordMatch(message)
+  // 2. Check keyword matches (within selected agents)
+  const keywordMatch = checkKeywordMatch(message, selectedIds)
   if (keywordMatch) {
     return {
       agent: keywordMatch.agent,
@@ -134,9 +159,14 @@ export function routeMessage(message: string): RouteResult {
     }
   }
 
-  // 3. Default to first active agent
+  // 3. Default to first active agent from selection
+  const defaultAgent = getDefaultAgent(selectedIds)
+  if (!defaultAgent) {
+    return null // No agents available in selection
+  }
+
   return {
-    agent: getDefaultAgent(),
+    agent: defaultAgent,
     confidence: "default",
   }
 }
@@ -172,6 +202,19 @@ export function shouldRouteToA2A(message: string): boolean {
     "on-chain",
     "onchain",
     "contract",
+    // Store agent keywords
+    "store",
+    "shop",
+    "buy",
+    "purchase",
+    "stationery",
+    "catalog",
+    // Payment agent keywords
+    "pay",
+    "payment",
+    "x402",
+    "usdc",
+    "checkout",
   ]
 
   for (const keyword of blockchainKeywords) {

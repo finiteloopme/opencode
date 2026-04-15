@@ -296,5 +296,117 @@ export const GlobalRoutes = lazy(() =>
         // No authentication available
         return c.json({ authenticated: false })
       },
+    )
+    .get(
+      "/registry/agents",
+      describeRoute({
+        summary: "List blockchain agents",
+        description:
+          "Proxy to the Agent Registry service to get a list of available blockchain agents (Somnia, Midnight, etc.).",
+        operationId: "global.registry.agents",
+        responses: {
+          200: {
+            description: "List of blockchain agents",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    agents: z.array(
+                      z.object({
+                        id: z.string(),
+                        name: z.string(),
+                        description: z.string(),
+                        url: z.string(),
+                        chainId: z.number(),
+                        keywords: z.array(z.string()),
+                        enabled: z.boolean(),
+                      }),
+                    ),
+                    version: z.string(),
+                    updated: z.string().optional(),
+                  }),
+                ),
+              },
+            },
+          },
+          502: {
+            description: "Agent registry unavailable",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ error: z.string() })),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const registryUrl = process.env.AGENT_REGISTRY_URL || "http://localhost:4000"
+        try {
+          const response = await fetch(`${registryUrl}/agents`, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(5000),
+          })
+          if (!response.ok) {
+            return c.json({ error: `Registry returned ${response.status}` }, 502)
+          }
+          const data = await response.json()
+          return c.json(data)
+        } catch (error) {
+          log.warn("failed to fetch from agent registry", { error, registryUrl })
+          return c.json({ error: "Agent registry unavailable" }, 502)
+        }
+      },
+    )
+    .get(
+      "/registry/agents/health",
+      describeRoute({
+        summary: "Get blockchain agents health",
+        description: "Proxy to the Agent Registry service to get health status of all blockchain agents.",
+        operationId: "global.registry.agents.health",
+        responses: {
+          200: {
+            description: "Health status of all agents",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.array(
+                    z.object({
+                      id: z.string(),
+                      healthy: z.boolean(),
+                      latencyMs: z.number().optional(),
+                      error: z.string().optional(),
+                    }),
+                  ),
+                ),
+              },
+            },
+          },
+          502: {
+            description: "Agent registry unavailable",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ error: z.string() })),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const registryUrl = process.env.AGENT_REGISTRY_URL || "http://localhost:4000"
+        try {
+          const response = await fetch(`${registryUrl}/agents/health`, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(10000), // Health checks take longer
+          })
+          if (!response.ok) {
+            return c.json({ error: `Registry returned ${response.status}` }, 502)
+          }
+          const data = await response.json()
+          return c.json(data)
+        } catch (error) {
+          log.warn("failed to fetch agent health from registry", { error, registryUrl })
+          return c.json({ error: "Agent registry unavailable" }, 502)
+        }
+      },
     ),
 )

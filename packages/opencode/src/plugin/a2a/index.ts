@@ -56,8 +56,15 @@ export async function A2APlugin(_input: PluginInput): Promise<Hooks> {
       "a2a-send": tool({
         description: `Send a message to a blockchain A2A agent. 
 The message will be automatically routed to the appropriate agent based on content, 
-or you can specify an agent explicitly. Use this for blockchain operations like:
-- Generating smart contracts (Solidity)
+or you can specify an agent explicitly.
+
+IMPORTANT: When asking an agent to compile code, include the full source code in the 
+message OR use the artifacts parameter. Agents maintain session state, so after generating 
+code you can simply say "compile" and the agent will use the previously generated code.
+
+Use this for blockchain operations like:
+- Generating smart contracts (Midnight Compact, Solidity)
+- Compiling contracts (include full source code or use artifacts param)
 - Deploying contracts
 - Checking transaction status
 - Querying on-chain state
@@ -74,9 +81,19 @@ The selectedAgents argument is ignored if a session selection exists.`,
             .number()
             .optional()
             .describe("Optional: Request timeout in milliseconds (default: 60000)"),
+          artifacts: tool.schema
+            .array(
+              tool.schema.object({
+                name: tool.schema.string().describe("Filename (e.g., 'contract.compact')"),
+                content: tool.schema.string().describe("File content"),
+                mimeType: tool.schema.string().optional().describe("MIME type (default: text/plain)"),
+              }),
+            )
+            .optional()
+            .describe("Optional: File artifacts to include with the message (e.g., source code files)"),
         },
         async execute(args, _context) {
-          const { message, agent: agentId, timeout } = args
+          const { message, agent: agentId, timeout, artifacts } = args
 
           // Deterministic agent filtering:
           // 1. Session selection (from frontend agent picker) takes precedence
@@ -141,6 +158,7 @@ The selectedAgents argument is ignored if a session selection exists.`,
             const response = await sendMessage(targetAgent.url, message, {
               timeout,
               contextId: _context.sessionID,
+              artifacts,
             })
 
             // Check for errors
